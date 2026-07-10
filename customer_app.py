@@ -87,7 +87,7 @@ with tab1:
                 try:
                     # Geminiで仕分け
                     response = client.models.generate_content(
-                        model=='models/gemini-1.5-flash',
+                        model='models/gemini-1.5-flash',
                         contents=prompt,
                     )
                     
@@ -180,7 +180,7 @@ with tab2:
                 
                 with st.spinner("AIがクラウドデータと照合中..."):
                     search_response = client.models.generate_content(
-                        model=='models/gemini-1.5-flash',
+                        model='models/gemini-1.5-flash',
                         contents=search_prompt,
                     )
                     st.session_state.last_search_result = search_response.text
