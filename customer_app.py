@@ -1,6 +1,7 @@
 import streamlit as st
 import re
-from google import genai
+# ⭕ 今日の最初に使っていた、1,500回使える古い方のライブラリに戻します！
+import google.generativeai as genai
 import json
 import gspread
 from google.oauth2.service_account import Credentials
@@ -11,8 +12,8 @@ from google.oauth2.service_account import Credentials
 # 1. あなたのスプレッドシートのURL
 SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/11zXSrk1YqlsxqxFcMCbe_64Hso3KOoR5qqm4K69RGHo/edit?gid=0#gid=0"
 
-# 2. Geminiクライアントの初期化
-client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+# 2. 【古い書き方】Geminiの初期化（1,500回使えるモード）
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
 # 3. Googleスプレッドシートへの接続関数
 def connect_to_sheet():
@@ -27,7 +28,6 @@ def connect_to_sheet():
 # =========================================================
 st.title("📱 爆速・顧客受付＆検索システム")
 
-# タブ（切り替え画面）を作って、「受付」と「営業検索」を分ける
 tab1, tab2 = st.tabs(["📝 受付メモ入力", "🔍 営業用・爆速検索"])
 
 # ---------------------------------------------------------
@@ -36,11 +36,8 @@ tab1, tab2 = st.tabs(["📝 受付メモ入力", "🔍 営業用・爆速検索"
 with tab1:
     st.info("🔒 **安心セキュリティ**: 4桁以上の数字（電話番号）は手元で自動消去されます。")
     
-    # 💡 フリーズ対策：入力欄リセット用のカウンタ
     if "input_key" not in st.session_state:
         st.session_state.input_key = 0
-    
-    # 💡 成功メッセージを安全に保持するための変数
     if "success_msg" not in st.session_state:
         st.session_state.success_msg = False
     
@@ -54,8 +51,6 @@ with tab1:
     if st.button("① データを安全に仕分けてスプレッドシートに保存"):
         if user_input:
             st.write("---")
-            
-            # 手元での電話番号フィルター
             safe_text = re.sub(r'\d{5,}', '[電話番号削除済み]', user_input)
             
             prompt = f"""
@@ -85,18 +80,14 @@ with tab1:
 
             with st.spinner("AIが仕分け＆スプレッドシートへ送信中..."):
                 try:
-                    # Geminiで仕分け
-                    response = client.models.generate_content(
-                        model='models/gemini-1.5-flash-002',
-                        contents=prompt,
-                    )
+                    # 💡 【古い書き方】1,500回使える gemini-1.5-flash を呼び出します！
+                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    response = model.generate_content(prompt)
                     
                     cleaned_json = response.text.replace("```json", "").replace("```", "").strip()
                     parsed_data = json.loads(cleaned_json)
                     
-                    # スプレッドシートへ接続して書き込み
                     sheet = connect_to_sheet()
-                    
                     row_to_add = [
                         parsed_data.get("来店時間", ""),
                         parsed_data.get("顧客名", ""),
@@ -108,7 +99,6 @@ with tab1:
                     ]
                     sheet.append_row(row_to_add)
                     
-                    # 💡 フリーズ対策：重いリロード命令(rerun)を使わず、セッション状態を切り替えて安全に即時反映させる
                     st.session_state.input_key += 1
                     st.session_state.success_msg = True
                     st.rerun()
@@ -118,13 +108,11 @@ with tab1:
         else:
             st.warning("テキストを入力してください。")
 
-    # 💡 画面リロード後に安全にメッセージと風船を出す（これでフリーズしません！）
     if st.session_state.success_msg:
         st.success("☁️ Googleスプレッドシートへのリアルタイム保存が成功しました！")
         st.balloons()
-        st.session_state.success_msg = False # 1度出したらリセット
+        st.session_state.success_msg = False
 
-    # クラウド上の最新データを下に一覧表示
     st.write("---")
     st.subheader("📋 スプレッドシート上の受付データ一覧")
     try:
@@ -142,7 +130,6 @@ with tab1:
 # ---------------------------------------------------------
 with tab2:
     st.subheader("🔎 「あの車だれ？」をスプレッドシートから爆速検索")
-    st.write("スプレッドシートに貯まった全員のデータから、AIが雑な言葉で該当者を探し出します。")
     
     if "search_key" not in st.session_state:
         st.session_state.search_key = 0
@@ -162,7 +149,7 @@ with tab2:
             current_db = sheet.get_all_records()
             
             if not current_db:
-                st.warning("スプレッドシートにデータが1件もありません。まずは受付入力タブでデータを登録してください。")
+                st.warning("スプレッドシートにデータが1件もありません。")
             elif search_query:
                 search_prompt = f"""
                 あなたは優秀な店舗受付アシスタントです。
@@ -179,10 +166,10 @@ with tab2:
                 """
                 
                 with st.spinner("AIがクラウドデータと照合中..."):
-                    search_response = client.models.generate_content(
-                        model='models/gemini-1.5-flash-002',
-                        contents=search_prompt,
-                    )
+                    # 💡 検索も 1.5-flash で回数無制限（1,500回）
+                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    search_response = model.generate_content(search_prompt)
+                    
                     st.session_state.last_search_result = search_response.text
                     st.session_state.search_key += 1
                     st.rerun()
