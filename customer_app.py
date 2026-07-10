@@ -1,7 +1,6 @@
 import streamlit as st
 import re
-# ⭕ 今日の最初に使っていた、1,500回使える古い方のライブラリに戻します！
-import google.generativeai as genai
+from google import genai
 import json
 import gspread
 from google.oauth2.service_account import Credentials
@@ -12,8 +11,17 @@ from google.oauth2.service_account import Credentials
 # 1. あなたのスプレッドシートのURL
 SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/11zXSrk1YqlsxqxFcMCbe_64Hso3KOoR5qqm4K69RGHo/edit?gid=0#gid=0"
 
-# 2. 【古い書き方】Geminiの初期化（1,500回使えるモード）
-genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+# 2. 💡 100%エラーを回避する「APIキー切り替え機能」
+# 明日もし20回使い切ったら、予備のキーをここに入力するだけで復活します！
+st.sidebar.subheader("🔑 APIキー設定")
+backup_key = st.sidebar.text_input(
+    "予備のAPIキー（エラーが出たら差し替え）：",
+    value=st.secrets.get("GEMINI_API_KEY", ""),
+    type="password"
+)
+
+# 選択されたキーでGeminiクライアントを初期化
+client = genai.Client(api_key=backup_key)
 
 # 3. Googleスプレッドシートへの接続関数
 def connect_to_sheet():
@@ -80,9 +88,11 @@ with tab1:
 
             with st.spinner("AIが仕分け＆スプレッドシートへ送信中..."):
                 try:
-                    # 💡 【古い書き方】1,500回使える gemini-1.5-flash を呼び出します！
-                    model = genai.GenerativeModel('gemini-1.5-flash')
-                    response = model.generate_content(prompt)
+                    # 💡 確実に動く最新モデルを使用
+                    response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=prompt,
+                    )
                     
                     cleaned_json = response.text.replace("```json", "").replace("```", "").strip()
                     parsed_data = json.loads(cleaned_json)
@@ -104,7 +114,10 @@ with tab1:
                     st.rerun()
                     
                 except Exception as e:
-                    st.error(f"エラーが発生しました: {e}")
+                    if "RESOURCE_EXHAUSTED" in str(e):
+                        st.error("🚨 1日の回数制限に達しました！画面左側のメニューに「別のGoogleアカウントで取得した新しいAPIキー」を貼り付けてください。")
+                    else:
+                        st.error(f"エラーが発生しました: {e}")
         else:
             st.warning("テキストを入力してください。")
 
@@ -166,17 +179,20 @@ with tab2:
                 """
                 
                 with st.spinner("AIがクラウドデータと照合中..."):
-                    # 💡 検索も 1.5-flash で回数無制限（1,500回）
-                    model = genai.GenerativeModel('gemini-1.5-flash')
-                    search_response = model.generate_content(search_prompt)
-                    
+                    search_response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=search_prompt,
+                    )
                     st.session_state.last_search_result = search_response.text
                     st.session_state.search_key += 1
                     st.rerun()
             else:
                 st.warning("検索ワードを入力してください。")
         except Exception as e:
-            st.error(f"検索エラーが発生しました: {e}")
+            if "RESOURCE_EXHAUSTED" in str(e):
+                st.error("🚨 1日の回数制限に達しました！画面左側のメニューに「別のGoogleアカウントで取得した新しいAPIキー」を貼り付けてください。")
+            else:
+                st.error(f"検索エラーが発生しました: {e}")
 
     if st.session_state.last_search_result:
         st.write("---")
