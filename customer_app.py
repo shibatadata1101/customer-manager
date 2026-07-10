@@ -10,7 +10,7 @@ from google.oauth2.service_account import Credentials
 # =========================================================
 SPREADSHEET_URL = "ここにあなたのスプレッドシートのURLを貼り付ける"
 
-# 最初のシンプルな初期化に戻します
+# 金庫（Secrets）からキーを読み込む設定に戻します
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
 def connect_to_sheet():
@@ -45,9 +45,9 @@ with tab1:
 
             with st.spinner("AIが送信中..."):
                 try:
-                    # 💡 余計な修飾なし、今日最初に動いていたモデル指定
+                    # 💡 確実・安定の「gemini-1.5-flash」を指定します
                     response = client.models.generate_content(
-                        model='gemini-2.5-flash',
+                        model='gemini-1.5-flash',
                         contents=prompt,
                     )
                     
@@ -84,13 +84,16 @@ with tab2:
     st.subheader("🔎 クラウド検索")
     search_query = st.text_input("検索ワード：")
     if st.button("AIで検索する"):
-        # （検索タブも同様にシンプルなモデル指定にしています）
         try:
             sheet = connect_to_sheet()
             current_db = sheet.get_all_records()
             if search_query and current_db:
                 search_prompt = f"クエリ「{search_query}」に対して、以下のデータから探して箇条書きで答えて：\n{json.dumps(current_db, ensure_ascii=False)}"
-                search_response = client.models.generate_content(model='gemini-2.5-flash', contents=search_prompt)
+                # 💡 検索側も1.5-flashに統一します
+                search_response = client.models.generate_content(
+                    model='gemini-1.5-flash', 
+                    contents=search_prompt
+                )
                 st.info(search_response.text)
         except Exception as e:
             st.error(f"検索エラー: {e}")
