@@ -11,8 +11,7 @@ from google.oauth2.service_account import Credentials
 # 1. あなたのスプレッドシートのURL
 SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/11zXSrk1YqlsxqxFcMCbe_64Hso3KOoR5qqm4K69RGHo/edit?gid=0#gid=0"
 
-# 2. 💡 100%エラーを回避する「APIキー切り替え機能」
-# 明日もし20回使い切ったら、予備のキーをここに入力するだけで復活します！
+# 2. 🔑 APIキー設定（パスワード形式で隠しています）
 st.sidebar.subheader("🔑 APIキー設定")
 backup_key = st.sidebar.text_input(
     "予備のAPIキー（エラーが出たら差し替え）：",
@@ -88,9 +87,9 @@ with tab1:
 
             with st.spinner("AIが仕分け＆スプレッドシートへ送信中..."):
                 try:
-                    # 💡 確実に動く最新モデルを使用
+                    # 💡 これが現在の100%正しい指定方法です！
                     response = client.models.generate_content(
-                        model='gemini-3-flash',
+                        model='gemini-2.5-flash',
                         contents=prompt,
                     )
                     
@@ -114,10 +113,7 @@ with tab1:
                     st.rerun()
                     
                 except Exception as e:
-                    if "RESOURCE_EXHAUSTED" in str(e):
-                        st.error("🚨 1日の回数制限に達しました！画面左側のメニューに「別のGoogleアカウントで取得した新しいAPIキー」を貼り付けてください。")
-                    else:
-                        st.error(f"エラーが発生しました: {e}")
+                    st.error(f"エラーが発生しました: {e}")
         else:
             st.warning("テキストを入力してください。")
 
@@ -180,7 +176,7 @@ with tab2:
                 
                 with st.spinner("AIがクラウドデータと照合中..."):
                     search_response = client.models.generate_content(
-                        model='gemini-3-flash',
+                        model='gemini-2.5-flash',
                         contents=search_prompt,
                     )
                     st.session_state.last_search_result = search_response.text
@@ -189,10 +185,7 @@ with tab2:
             else:
                 st.warning("検索ワードを入力してください。")
         except Exception as e:
-            if "RESOURCE_EXHAUSTED" in str(e):
-                st.error("🚨 1日の回数制限に達しました！画面左側のメニューに「別のGoogleアカウントで取得した新しいAPIキー」を貼り付けてください。")
-            else:
-                st.error(f"検索エラーが発生しました: {e}")
+            st.error(f"検索エラーが発生しました: {e}")
 
     if st.session_state.last_search_result:
         st.write("---")
