@@ -1,0 +1,3 @@
+google-genai
+gspread
+google-auth
