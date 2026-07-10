@@ -47,7 +47,7 @@ with tab1:
                 try:
                     # 無料枠でも世界中で一番安定して稼働しているモデルです
                     response = client.models.generate_content(
-                        model='gemini-1.5-flash',
+                        model='gemini-2.0-flash',
                         contents=prompt,
                     )
                     
@@ -90,7 +90,7 @@ with tab2:
             if search_query and current_db:
                 search_prompt = f"クエリ「{search_query}」に対して、以下のデータから探して箇条書きで答えて：\n{json.dumps(current_db, ensure_ascii=False)}"
                 search_response = client.models.generate_content(
-                    model='gemini-1.5-flash', 
+                    model='gemini-2.0-flash', 
                     contents=search_prompt
                 )
                 st.info(search_response.text)
