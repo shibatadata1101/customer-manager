@@ -90,7 +90,7 @@ with tab1:
                 try:
                     # 💡 確実に動く最新モデルを使用
                     response = client.models.generate_content(
-                        model='gemini-2.5-flash',
+                        model='gemini-3-flash',
                         contents=prompt,
                     )
                     
@@ -180,7 +180,7 @@ with tab2:
                 
                 with st.spinner("AIがクラウドデータと照合中..."):
                     search_response = client.models.generate_content(
-                        model='gemini-2.5-flash',
+                        model='gemini-3-flash',
                         contents=search_prompt,
                     )
                     st.session_state.last_search_result = search_response.text
