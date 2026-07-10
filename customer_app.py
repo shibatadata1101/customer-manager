@@ -8,9 +8,9 @@ from google.oauth2.service_account import Credentials
 # =========================================================
 # ⚙️ 初期設定（Gemini ＆ Googleスプレッドシート）
 # =========================================================
-SPREADSHEET_URL = "ここにあなたのスプレッドシートのURLを貼り付ける"
+SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/11zXSrk1YqlsxqxFcMCbe_64Hso3KOoR5qqm4K69RGHo/edit?gid=0#gid=0"
 
-# 金庫（Secrets）からキーを読み込む設定に戻します
+# 一番確実な金庫（Secrets）からの読み込み
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
 def connect_to_sheet():
@@ -45,7 +45,7 @@ with tab1:
 
             with st.spinner("AIが送信中..."):
                 try:
-                    # 💡 確実・安定の「gemini-1.5-flash」を指定します
+                    # 無料枠でも世界中で一番安定して稼働しているモデルです
                     response = client.models.generate_content(
                         model='gemini-1.5-flash',
                         contents=prompt,
@@ -89,7 +89,6 @@ with tab2:
             current_db = sheet.get_all_records()
             if search_query and current_db:
                 search_prompt = f"クエリ「{search_query}」に対して、以下のデータから探して箇条書きで答えて：\n{json.dumps(current_db, ensure_ascii=False)}"
-                # 💡 検索側も1.5-flashに統一します
                 search_response = client.models.generate_content(
                     model='gemini-1.5-flash', 
                     contents=search_prompt
