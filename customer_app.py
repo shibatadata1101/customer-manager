@@ -4,6 +4,7 @@ from google import genai
 import json
 import gspread
 from google.oauth2.service_account import Credentials
+from google.genai import types
 
 # =========================================================
 # ⚙️ 初期設定（Gemini ＆ Googleスプレッドシート）
@@ -12,6 +13,7 @@ SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/11zXSrk1YqlsxqxFcMCbe_
 
 # 一番確実な金庫（Secrets）からの読み込み
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+print("1")
 
 def connect_to_sheet():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -47,13 +49,18 @@ with tab1:
                 try:
                     # 無料枠でも世界中で一番安定して稼働しているモデルです
                     response = client.models.generate_content(
-                        model='gemini-2.5-flash',
+                        model='gemini-3.1-flash-lite',
                         contents=prompt,
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json", # 👈 これを入れると挨拶を完全に禁止できます
+                        ),
                     )
                     
-                    cleaned_json = response.text.replace("```json", "").replace("```", "").strip()
+                    # 1. 階層を正しく辿ってテキストを抜き出す
+                    cleaned_json = response.candidates[0].content.parts[0].text
+
                     parsed_data = json.loads(cleaned_json)
-                    
+                                       
                     sheet = connect_to_sheet()
                     row_to_add = [
                         parsed_data.get("来店時間", ""), parsed_data.get("顧客名", ""),
@@ -90,7 +97,7 @@ with tab2:
             if search_query and current_db:
                 search_prompt = f"クエリ「{search_query}」に対して、以下のデータから探して箇条書きで答えて：\n{json.dumps(current_db, ensure_ascii=False)}"
                 search_response = client.models.generate_content(
-                    model='gemini-2.5-flash', 
+                    model='gemini-3.1-flash-lite', 
                     contents=search_prompt
                 )
                 st.info(search_response.text)
