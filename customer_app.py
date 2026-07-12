@@ -65,7 +65,7 @@ with tab1:
     if st.button("① データを安全に仕分けてスプレッドシートに保存"):
         if user_input:
             # 💡 4桁以上の数字（例：電話番号など）を隠す（UIの説明と一致するよう修正）
-            safe_text = re.sub(r'\d{4,}', '[個人情報削除済み]', user_input)
+            safe_text = re.sub(r'\d{5,}', '[個人情報削除済み]', user_input)
             
             prompt = f"""
             以下の「受付メモ」から情報を抽出し、指定されたフォーマットで出力してください。
