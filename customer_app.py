@@ -80,12 +80,46 @@ def mask_sensitive_data(text, names_list):
     masked_text = text
     replacements = {}
     
-    # 1. 5桁以上の数字を削除
-    masked_text = re.sub(r'\d{5,}', '', masked_text)
-    
-    # 2. 苗字の置換（先に置換して保護）
+    # 1. 時間表現 (例: 13:00, 13時) を退避
+    # 「数字＋時」「数字＋:」が含まれるものを先に保護します
+    times = re.findall(r'\d{1,2}(?::\d{2}|時)', masked_text)
+    time_map = {}
+    for i, t in enumerate(times):
+        placeholder = f"__TIME_{i}__"
+        time_map[placeholder] = t
+        masked_text = masked_text.replace(t, placeholder)
+
+    # 2. 数字の置換（純粋なナンバーのみを対象にする）
+    num_count = 1
+    # 「__TIME_」に含まれる数字を誤爆しないよう、置換対象を限定
+    # 正規表現を使わず、単純に数字の塊を探す
+    i = 0
+    while i < len(masked_text):
+        # __TIME_X__ のような避難用プレースホルダーは絶対にいじらない
+        if masked_text.startswith("__TIME_", i):
+            i = masked_text.find("__", i + 1) + 2
+            continue
+        
+        if masked_text[i:i+1].isdigit():
+            j = i
+            while j < len(masked_text) and masked_text[j].isdigit():
+                j += 1
+            
+            # 【重要】ここがポイント：数字のかたまりが「時」や「:」と隣接していない場合のみ置換
+            # また、数字のみで構成されているか確認
+            num_str = masked_text[i:j]
+            if 1 <= len(num_str) <= 4:
+                placeholder = f"[NUMBER_{num_count}]"
+                replacements[placeholder] = num_str
+                masked_text = masked_text[:i] + placeholder + masked_text[j:]
+                i += len(placeholder)
+                num_count += 1
+                continue
+        i += 1
+
+    # 3. 苗字の置換
     name_count = 1
-    honorifics = ["さん", "様", "君", "くん", "営業", "氏"]
+    honorifics = ["さん", "様", "君", "くん", "営業", "氏", "さま"] # "さま"を追加
     for name in names_list:
         for hon in honorifics:
             target = f"{name}{hon}"
@@ -95,98 +129,10 @@ def mask_sensitive_data(text, names_list):
                 masked_text = masked_text.replace(target, f"{placeholder}{hon}")
                 name_count += 1
                 break
-    
-    # 3. 車のナンバー置換（時間 12:00 を避ける）
-    i = 0
-    num_count = 1
-    while i < len(masked_text):
-        if masked_text[i] == '[':
-            close_idx = masked_text.find(']', i)
-            if close_idx != -1:
-                i = close_idx + 1
-                continue
-        
-        if masked_text[i:i+1].isdigit():
-            j = i
-            while j < len(masked_text) and masked_text[j].isdigit():
-                j += 1
-            num_str = masked_text[i:j]
-            
-            # 1〜4桁 かつ コロンに隣接していない場合のみ
-            if 1 <= len(num_str) <= 4:
-                is_time = (i > 0 and masked_text[i-1] == ':') or (j < len(masked_text) and masked_text[j] == ':')
                 
-                if not is_time:
-                    placeholder = f"[NUMBER_{num_count}]"
-                    replacements[placeholder] = num_str
-                    masked_text = masked_text[:i] + placeholder + masked_text[j:]
-                    i += len(placeholder)
-                    num_count += 1
-                    continue
-            i = j
-        else:
-            i += 1
-                
-    return masked_text, replacements
-    if not text:
-        return "", {}
-    
-    masked_text = text
-    replacements = {}
-    
-    # 1. 5桁以上の数字を削除
-    masked_text = re.sub(r'\d{5,}', '', masked_text)
-    
-    # 2. 苗字の置換（先に置換して保護する）
-    name_count = 1
-    honorifics = ["さん", "様", "君", "くん", "営業", "氏"]
-    for name in names_list:
-        for hon in honorifics:
-            target = f"{name}{hon}"
-            if target in masked_text:
-                placeholder = f"[NAME_{name_count}]"
-                replacements[placeholder] = name
-                masked_text = masked_text.replace(target, f"{placeholder}{hon}")
-                name_count += 1
-                break
-    
-    # 3. 車のナンバー置換（時間表記 12:00 を避けるロジック）
-    # 文章を1文字ずつ見て、数字のかたまりを探す
-    i = 0
-    num_count = 1
-    while i < len(masked_text):
-        # プレースホルダーの中身はスキップ
-        if masked_text[i] == '[':
-            close_idx = masked_text.find(']', i)
-            if close_idx != -1:
-                i = close_idx + 1
-                continue
-        
-        # 数字を見つけたら
-        if masked_text[i:i+1].isdigit():
-            # 数字のかたまりを取得
-            j = i
-            while j < len(masked_text) and masked_text[j].isdigit():
-                j += 1
-            num_str = masked_text[i:j]
-            
-            # 1〜4桁かつ、コロンに隣接していない場合のみナンバーとみなす
-            if 1 <= len(num_str) <= 4:
-                is_time = False
-                # 直前または直後にコロンがあれば時間とみなしてスキップ
-                if (i > 0 and masked_text[i-1] == ':') or (j < len(masked_text) and masked_text[j] == ':'):
-                    is_time = True
-                
-                if not is_time:
-                    placeholder = f"[NUMBER_{num_count}]"
-                    replacements[placeholder] = num_str
-                    masked_text = masked_text[:i] + placeholder + masked_text[j:]
-                    i += len(placeholder)
-                    num_count += 1
-                    continue
-            i = j
-        else:
-            i += 1
+    # 4. 時間を元に戻す
+    for placeholder, original_time in time_map.items():
+        masked_text = masked_text.replace(placeholder, original_time)
                 
     return masked_text, replacements
 
@@ -293,7 +239,6 @@ with tab1:
                                 parsed_data[key] = replacements[val]
                             # 💡 重要：もしAIが「14:00」をそのまま返しているなら、
                             # それは書き換えられずにそのままスプレッドシートに保存されます（これでOK）
-                                           
                         row_to_add = [
                             parsed_data.get("来店時間", "NoData"), parsed_data.get("顧客名", "NoData"),
                             parsed_data.get("担当営業", "NoData"), parsed_data.get("来店内容", "NoData"),
