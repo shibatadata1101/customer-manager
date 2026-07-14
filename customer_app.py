@@ -83,6 +83,60 @@ def mask_sensitive_data(text, names_list):
     # 1. 5桁以上の数字を削除
     masked_text = re.sub(r'\d{5,}', '', masked_text)
     
+    # 2. 苗字の置換（先に置換して保護）
+    name_count = 1
+    honorifics = ["さん", "様", "君", "くん", "営業", "氏"]
+    for name in names_list:
+        for hon in honorifics:
+            target = f"{name}{hon}"
+            if target in masked_text:
+                placeholder = f"[NAME_{name_count}]"
+                replacements[placeholder] = name
+                masked_text = masked_text.replace(target, f"{placeholder}{hon}")
+                name_count += 1
+                break
+    
+    # 3. 車のナンバー置換（時間 12:00 を避ける）
+    i = 0
+    num_count = 1
+    while i < len(masked_text):
+        if masked_text[i] == '[':
+            close_idx = masked_text.find(']', i)
+            if close_idx != -1:
+                i = close_idx + 1
+                continue
+        
+        if masked_text[i:i+1].isdigit():
+            j = i
+            while j < len(masked_text) and masked_text[j].isdigit():
+                j += 1
+            num_str = masked_text[i:j]
+            
+            # 1〜4桁 かつ コロンに隣接していない場合のみ
+            if 1 <= len(num_str) <= 4:
+                is_time = (i > 0 and masked_text[i-1] == ':') or (j < len(masked_text) and masked_text[j] == ':')
+                
+                if not is_time:
+                    placeholder = f"[NUMBER_{num_count}]"
+                    replacements[placeholder] = num_str
+                    masked_text = masked_text[:i] + placeholder + masked_text[j:]
+                    i += len(placeholder)
+                    num_count += 1
+                    continue
+            i = j
+        else:
+            i += 1
+                
+    return masked_text, replacements
+    if not text:
+        return "", {}
+    
+    masked_text = text
+    replacements = {}
+    
+    # 1. 5桁以上の数字を削除
+    masked_text = re.sub(r'\d{5,}', '', masked_text)
+    
     # 2. 苗字の置換（先に置換して保護する）
     name_count = 1
     honorifics = ["さん", "様", "君", "くん", "営業", "氏"]
@@ -224,18 +278,21 @@ with tab1:
                             ),
                         )
                         
+                        # AIの回答を受け取った後
                         cleaned_json = response.candidates[0].content.parts[0].text
                         parsed_data = json.loads(cleaned_json)
-                        
+
                         # 裏に残しておいた連番の対応表を取得
                         replacements = st.session_state.get("replacements", {})
-                        
-                        # AIから返ってきたすべての項目をチェックし、部分一致ではなく「完全一致」で復元する
+
                         for key in parsed_data:
                             val = str(parsed_data[key])
-                            # もしAIの返答（例: "[NAME_1]"）が対応表のキーにあれば、元の値（例: "佐藤"）に書き換える
+                            # 完全一致で復元！
+                            # [NUMBER_1] や [NAME_1] があれば元の値に書き換える
                             if val in replacements:
                                 parsed_data[key] = replacements[val]
+                            # 💡 重要：もしAIが「14:00」をそのまま返しているなら、
+                            # それは書き換えられずにそのままスプレッドシートに保存されます（これでOK）
                                            
                         row_to_add = [
                             parsed_data.get("来店時間", "NoData"), parsed_data.get("顧客名", "NoData"),
