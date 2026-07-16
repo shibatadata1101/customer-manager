@@ -80,9 +80,9 @@ def mask_sensitive_data(text, names_list):
     masked_text = text
     replacements = {}
     
-    # 1. 時間表現 (例: 13:00, 13時) を退避
-    # 「数字＋時」「数字＋:」が含まれるものを先に保護します
-    times = re.findall(r'\d{1,2}(?::\d{2}|時)', masked_text)
+# --- ステップ1: 時間 (11:00, 11時, 11時30分) を退避 ---
+    # 分を含めた時間表現を網羅的に見つける
+    times = re.findall(r'\d{1,2}(?::\d{2}|時(?:\d{1,2}分)?)', masked_text)
     time_map = {}
     for i, t in enumerate(times):
         placeholder = f"__TIME_{i}__"
@@ -233,10 +233,15 @@ with tab1:
 
                         for key in parsed_data:
                             val = str(parsed_data[key])
-                            # 完全一致で復元！
-                            # [NUMBER_1] や [NAME_1] があれば元の値に書き換える
-                            if val in replacements:
-                                parsed_data[key] = replacements[val]
+                            
+                            # 登録されている全プレースホルダーを正規表現で一括置換
+                            for placeholder, original_value in replacements.items():
+                                # re.escapeで記号を安全にし、\b（単語の境界）に近い判定を行う
+                                # これにより [NAME_1] 以外の誤置換を物理的に防げます
+                                pattern = re.escape(placeholder)
+                                val = re.sub(pattern, str(original_value), val)
+                            
+                            parsed_data[key] = val
                             # 💡 重要：もしAIが「14:00」をそのまま返しているなら、
                             # それは書き換えられずにそのままスプレッドシートに保存されます（これでOK）
                         row_to_add = [
@@ -364,10 +369,27 @@ with tab2:
                 row_combined_text = " ".join([str(val) for val in row.values()])
                 normalized_row_text = normalize_text(row_combined_text)
                 
-                if normalized_query in normalized_row_text:
-                    # スプレッドシートのキー（ヘッダー）と値をきれいな辞書形式にして保存
-                    clean_row = {str(k): str(v) for k, v in row.items()}
-                    hit_records.append(clean_row)
+                # 💡 退避させておいたワードを使って、ローカル（手元）だけで高速検索
+                if st.session_state.current_query:                    
+                    # 検索キーワードをスペースで分割してリスト化
+                    # 💡 検索キーワードを「スペース、全角スペース、コンマ、読点」で分割する
+                    # [  ,、] は「半角スペース、全角スペース、カンマ、読点」のいずれか
+                    query_parts = re.split(r'[  ,、]+', normalize_text(st.session_state.current_query))
+                    
+                    # 空文字（連続する区切り文字など）を除外
+                    query_parts = [p for p in query_parts if p]
+                    
+                    if st.session_state.raw_records:
+                        hit_records = []
+                        for row in st.session_state.raw_records:
+                            # 行内の全データ結合
+                            row_combined_text = " ".join([str(val) for val in row.values()])
+                            normalized_row_text = normalize_text(row_combined_text)
+                            
+                            # 分割したキーワードすべてが含まれているかAND判定
+                            if all(part in normalized_row_text for part in query_parts):
+                                clean_row = {str(k): str(v) for k, v in row.items()}
+                                hit_records.append(clean_row)
 
             # 💡 検索結果の表示
             if hit_records:
