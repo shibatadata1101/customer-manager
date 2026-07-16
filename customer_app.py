@@ -82,7 +82,7 @@ def mask_sensitive_data(text, names_list):
     
 # --- ステップ1: 時間 (11:00, 11時, 11時30分) を退避 ---
     # 分を含めた時間表現を網羅的に見つける
-    times = re.findall(r'\d{1,2}(?::\d{2}|時(?:\d{1,2}分)?)', masked_text)
+    times = re.findall(r'\d{1,2}(?:[:：]\d{2}|時(?:\d{1,2}分)?)', masked_text)
     time_map = {}
     for i, t in enumerate(times):
         placeholder = f"__TIME_{i}__"
